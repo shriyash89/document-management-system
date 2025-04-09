@@ -3,43 +3,47 @@
     <div class="d-flex">
       <b>Document Versions</b>
       <v-spacer></v-spacer>
-      <v-btn depressed small>
+      <v-btn v-if="!showCompare" depressed small @click="showCompare=true">
         Compare
       </v-btn>
+      <v-btn v-else depressed color="blue" small @click="handleCancelCompare()">
+        Cancel Compare
+      </v-btn>
     </div>
-    <div class="mt-4 mb-4">
+    <div class="my-4 pa-0">
         <v-card
-          class="mx-auto mb-3"
-          max-width="344"
-          outlined
           v-for="version in tillAllVersions"
           :key="version.id"
+          class="mx-auto mb-3 pa-3"
+          :class="{selectCard : isThisClass(version.id)}"
+          max-width="344"
+          outlined
           @click="selecteVersion(version)"
         >
           <div class="d-flex">
-            <v-list-item three-line>
-            <v-list-item-content>
-              <v-list-item-title class="text-h6 mb-1">
+            <div>
+              <span class="text-h6 pa-0 ma-0">
                 {{version.name}}
-              </v-list-item-title>
-              <v-list-item-subtitle>{{version.created}}</v-list-item-subtitle>
-            </v-list-item-content>
-            </v-list-item>
+              </span>
+              <v-list-item-subtitle style="color:grey;">{{version.created}}</v-list-item-subtitle>
+            </div>
             <v-spacer></v-spacer>
-            <v-chip color="green" class="mr-4 mt-4">Approved</v-chip>
+            <v-chip dark :color="`${chipColor(version.state)}`" class="mr-4 mt-4 pa-3 pr-3"><span>{{version.state}}</span></v-chip>
           </div>
         </v-card>
     </div>
-    <div v-if="selectedVersion" class="mt-5">
+    <div v-if="selectedVersion" class="my-5">
       <template>
         <v-card
-          class="mx-auto pa-4"
+          class="mx-auto pa-4 blue-grey lighten-5"
           max-width="344"
         >
           <div class="d-flex mb-3">
-            <b>Version details</b>
+            <h3>Version Details</h3>
             <v-spacer></v-spacer>
-            <v-btn v-if="!showEdit" small @click="showEdit=true">edit</v-btn>
+            <v-btn text large color="blue" v-if="!showEdit" small @click="showEdit=true">edit 
+              <v-icon>mdi-arrow-right</v-icon>
+            </v-btn>
             <div v-if="showEdit">
               <v-btn small dark color="red" @click="showEdit=false">cancel</v-btn>
               <v-btn small dark color="green" class="ml-3" @click="handleSave">save</v-btn>
@@ -53,7 +57,6 @@
           <div class="d-flex mb-3">
             <span>Created:</span>
             <v-spacer></v-spacer>
-            <!-- <span v-if="!showEdit">{{selectedVersion.created}}</span> -->
             <v-menu
               ref="menu"
               v-model="menu"
@@ -66,11 +69,11 @@
               <template v-slot:activator="{ on, attrs }">
                 <v-text-field
                   v-model="date"
-                  label="Picker in menu"
                   prepend-icon="mdi-calendar"
                   readonly
                   v-bind="attrs"
                   v-on="on"
+                  style="width: 100px;"
                 ></v-text-field>
               </template>
               <v-date-picker
@@ -95,11 +98,6 @@
                 </v-btn>
               </v-date-picker>
             </v-menu>
-            <!-- <v-text-field
-              v-if="showEdit"
-              v-model="selectedVersion.created"
-              class="ma-0 pa-0"
-            >{{selectedVersion.created}}</v-text-field> -->
           </div>
           <div class="d-flex mb-3">
             <span>Author:</span>
@@ -114,7 +112,9 @@
           <div class="d-flex mb-3">
             <span>State:</span>
             <v-spacer></v-spacer>
-            <span v-if="!showEdit">{{selectedVersion.state}}</span>
+            <span v-if="!showEdit">
+              <v-chip small dark :color="`${chipColor(selectedVersion.state)}`" class="pa-3 pr-3"><span>{{selectedVersion.state}}</span></v-chip>
+            </span>
             <v-select
               v-if="showEdit"
               :items="['Draft','In review','Approved']"
@@ -135,16 +135,63 @@
         </v-card>
       </template>
     </div>
+    <div v-if="showCompare">
+      <template>
+        <v-card
+          class="mx-auto pa-4"
+          max-width="344"
+        >
+        <h3>version Comparison</h3>
+        <v-card
+          class="mx-auto pa-2 mt-3 mb-5 blue-grey lighten-5"
+          max-width="344"
+        >
+        <div class="d-flex">
+          <div class="dotStyle" style="background-color: green;">
+          </div>
+          <span class="ml-3">Added Content</span>
+        </div>
+        <div class="d-flex">
+          <div class="dotStyle" style="background-color: red;">
+          </div>
+          <span class="ml-3">Removed Content</span>
+        </div>
+        <div class="d-flex">
+          <div class="dotStyle" style="background-color: orange;">
+          </div>
+          <span class="ml-3">Modified Content</span>
+        </div>
+        </v-card>
+
+        <span>comparing version {{ selectedVersion?.name }} with {{ compareVersion?.name }}</span>
+        <div>
+          <v-card
+            class="mx-auto pa-2 mt-3 blue-grey lighten-5"
+            max-width="344"
+          >
+            <div v-for="(change,index) in changes" :key="index">
+              <span :class="change.color"> - {{ change.note }}</span>
+            </div>
+          </v-card>
+        </div>
+      </v-card>
+      </template>
+      
+    </div>
   </div>
 </template>
 
 <script>
 import axios from "axios"
+
 export default {
   data() {
     return {
       tillAllVersions : [],
       selectedVersion : null,
+      compareVersion:"val",
+      showCompare : false,
+      changes : [],
       showEdit : false,
       date: (new Date(Date.now() - (new Date()).getTimezoneOffset() * 60000)).toISOString().substr(0, 10),
       menu: false,
@@ -154,8 +201,38 @@ export default {
   },
   methods: {
     selecteVersion(version){
-      this.selectedVersion = version
-      this.date = this.selectedVersion.created
+      if(this.showCompare){
+        this.compareVersion = version
+        this.compareVersions()
+      }
+      else{
+        this.selectedVersion = version
+        this.date = this.selectedVersion.created
+        console.log("selectedversion",version.id)
+      }
+      
+    },
+    compareVersions(){
+      this.changes = []
+      for (const [key] of Object.entries(this.selectedVersion)) {
+        if(this.selectedVersion[key]!=this.compareVersion[key]){
+          if(key==="author" || key==="state" || key==="review" || key==="approval" || key==="expiration" || key==="publication"){
+            const val1 = this.selectedVersion[key]
+            const val2 = this.compareVersion[key]
+            if(!val1 && val2)
+              this.changes.push({note : `${key} added with value "${this.compareVersion[key]}"`,color:"green--text"})
+            else if(val1 && !val2)
+              this.changes.push({note : `${key} removed from "${this.selectedVersion[key]}"`,color:"red--text"})
+            else
+              this.changes.push({note : `${key} changed from "${this.selectedVersion[key]}" to "${this.compareVersion[key]}"`,color:"orange--text"})
+          }
+        }
+      }
+    },
+    chipColor(status){
+      if(status==="Draft")return "blue"
+      else if(status==="In review") return "orange"
+      return "green"
     },
     handleSave(){
       console.log("selectedVersion",this.selectedVersion)
@@ -170,6 +247,12 @@ export default {
           console.log("error",err)
         })
     },
+    handleCancelCompare(){
+      this.showCompare=false
+      this.compareVersion=null
+      this.compareVersion = null
+      this.selectedVersion = null
+    },
     formatDate (date) {
       if (!date) return null
 
@@ -182,6 +265,11 @@ export default {
       const [month, day, year] = date.split('/')
       return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
     },
+    isThisClass(id){
+      if(id===this.selectedVersion?.id)
+        return true
+      return false
+    }
   },
   created(){
     axios.get('http://localhost:5000/versions')
@@ -209,4 +297,14 @@ export default {
 </script>
 
 <style scoped>
+.selectCard{
+  background-color: #E3F2FD;
+  border: 1px solid rgb(0, 0, 255);
+}
+.dotStyle{
+  height: 10px;
+  width: 10px;
+  border-radius: 50%;
+  margin-top: 5px;
+}
 </style>
