@@ -41,11 +41,11 @@
           <div class="d-flex mb-3">
             <h3>Version Details</h3>
             <v-spacer></v-spacer>
-            <v-btn text large color="blue" v-if="!showEdit" small @click="showEdit=true">edit 
+            <v-btn text large color="blue" v-if="!showEdit" small @click="handleShowEdit">edit 
               <v-icon>mdi-arrow-right</v-icon>
             </v-btn>
             <div v-if="showEdit">
-              <v-btn small dark color="red" @click="showEdit=false">cancel</v-btn>
+              <v-btn small dark color="red" @click="handleCancelShowEdit">cancel</v-btn>
               <v-btn small dark color="green" class="ml-3" @click="handleSave">save</v-btn>
             </div>
           </div>
@@ -57,7 +57,9 @@
           <div class="d-flex mb-3">
             <span>Created:</span>
             <v-spacer></v-spacer>
+            <span v-if="!showEdit">{{selectedVersion.created}}</span>
             <v-menu
+              v-if="showEdit"
               ref="menu"
               v-model="menu"
               :close-on-content-click="false"
@@ -68,15 +70,19 @@
             >
               <template v-slot:activator="{ on, attrs }">
                 <v-text-field
+                  v-if="showEdit"
                   v-model="date"
-                  prepend-icon="mdi-calendar"
+                  append-icon="mdi-calendar"
                   readonly
                   v-bind="attrs"
                   v-on="on"
-                  style="width: 100px;"
+                  dense
+                  outlined
+                  style="max-width: 140px;"
                 ></v-text-field>
               </template>
               <v-date-picker
+                v-if="showEdit"
                 v-model="date"
                 no-title
                 scrollable
@@ -105,9 +111,11 @@
             <span v-if="!showEdit">{{selectedVersion.author}}</span>
             <v-text-field
               v-if="showEdit"
-              v-model="selectedVersion.author"
-              class="ma-0 pa-0"
-            >{{selectedVersion.author}}</v-text-field>
+              v-model="author"
+              dense
+              outlined
+              style="max-width: 140px;"
+            >{{author}}</v-text-field>
           </div>
           <div class="d-flex mb-3">
             <span>State:</span>
@@ -118,8 +126,11 @@
             <v-select
               v-if="showEdit"
               :items="['Draft','In review','Approved']"
-              v-model="selectedVersion.state"
-              item-value="selectedVersion.state"
+              v-model="state"
+              item-value="state"
+              dense
+              outlined
+              style="max-width: 140px;"
             ></v-select>
           </div>
           <div class="d-flex mb-3">
@@ -128,14 +139,15 @@
             <span v-if="!showEdit">{{selectedVersion.changes ? selectedVersion.changes:"none"}}</span>
             <v-text-field
               v-if="showEdit"
-              v-model="selectedVersion.changes"
-              class="ma-0 pa-0"
-            >{{selectedVersion.changes}}</v-text-field>
+              v-model="change"
+              outlined
+              dense
+            >{{change}}</v-text-field>
           </div>
         </v-card>
       </template>
     </div>
-    <div v-if="showCompare">
+    <div v-if="selectedVersion&&compareVersion">
       <template>
         <v-card
           class="mx-auto pa-4"
@@ -163,7 +175,7 @@
         </div>
         </v-card>
 
-        <span>comparing version {{ selectedVersion?.name }} with {{ compareVersion?.name }}</span>
+        <span>comparing {{ selectedVersion?.name }} with {{ compareVersion?.name }}</span>
         <div>
           <v-card
             class="mx-auto pa-2 mt-3 blue-grey lighten-5"
@@ -187,9 +199,8 @@ import axios from "axios"
 export default {
   data() {
     return {
-      tillAllVersions : [],
       selectedVersion : null,
-      compareVersion:"val",
+      compareVersion:"",
       showCompare : false,
       changes : [],
       showEdit : false,
@@ -197,7 +208,16 @@ export default {
       menu: false,
       modal: false,
       menu2: false,
+      author : '',
+      state : '',
+      change : ''
     };
+  },
+  props:{
+    tillAllVersions :{
+      type : Array,
+      required : true
+    }
   },
   methods: {
     selecteVersion(version){
@@ -210,13 +230,30 @@ export default {
         this.date = this.selectedVersion.created
         console.log("selectedversion",version.id)
       }
-      
+    },
+    handleShowEdit(){
+      this.showEdit=true
+      this.date=this.selectedVersion.created
+      this.author=this.selectedVersion.author
+      this.state=this.selectedVersion.state
+      this.change=this.selectedVersion.changes
+    },
+    handleCancelShowEdit(){
+      this.showEdit=false
+      this.date=null
+      this.author=''
+      this.state=''
+      this.change=''
     },
     compareVersions(){
+      if(this.selectedVersion?.name==this.compareVersion?.name){
+        this.compareVersion = ""
+        return
+      }
       this.changes = []
       for (const [key] of Object.entries(this.selectedVersion)) {
         if(this.selectedVersion[key]!=this.compareVersion[key]){
-          if(key==="author" || key==="state" || key==="review" || key==="approval" || key==="expiration" || key==="publication"){
+          if(key==="author" || key==="state" || key==="changes" || key==="created"){
             const val1 = this.selectedVersion[key]
             const val2 = this.compareVersion[key]
             if(!val1 && val2)
@@ -235,9 +272,10 @@ export default {
       return "green"
     },
     handleSave(){
-      console.log("selectedVersion",this.selectedVersion)
       this.selectedVersion.created = this.date
-      console.log("date",this.date)
+      this.selectedVersion.author=this.author
+      this.selectedVersion.state=this.state
+      this.selectedVersion.changes=this.change
       axios.put('http://localhost:5000/editVersion/'+this.selectedVersion.id,this.selectedVersion)
         .then(res => {
           console.log("response",res.data)
@@ -271,17 +309,6 @@ export default {
       return false
     }
   },
-  created(){
-    axios.get('http://localhost:5000/versions')
-      .then(res => {
-        console.log("response",res.data)
-        this.tillAllVersions = []
-        this.tillAllVersions = res.data.versions
-      })
-      .catch(err=>{
-        console.log("error",err)
-      })
-  },
   computed: {
     computedDateFormatted () {
       return this.formatDate(this.date)
@@ -306,5 +333,14 @@ export default {
   width: 10px;
   border-radius: 50%;
   margin-top: 5px;
+}
+.textfields .v-text-field.v-text-field--enclosed .v-text-field__details{
+  display: none !important;
+}
+.v-messages{
+  display: none !important;
+}
+.v-text-field.v-text-field--enclosed .v-text-field_details_ {
+display: none !important;
 }
 </style>

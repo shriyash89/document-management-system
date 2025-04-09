@@ -18,7 +18,7 @@
           </v-timeline-item>
           <v-timeline-item small class="text-right">
             <template v-slot:opposite>
-              <v-btn small dark color="blue" class="ml-4 mt-4" @click="handleSave">save</v-btn>
+              <v-btn small dark color="blue" class="ml-4 mt-4" @click="handleSave('review')">save</v-btn>
             </template>
             <b>Review Phase</b>
             <br>
@@ -54,7 +54,7 @@
           </v-timeline-item>
           <v-timeline-item small left class="text-right">
             <template v-slot:opposite>
-              <v-btn small dark color="blue" class="ml-4 mt-4" @click="handleSave">save</v-btn>
+              <v-btn small dark color="blue" class="ml-4 mt-4" @click="handleSave('approval')">save</v-btn>
             </template>
             <b>Approval deadline</b>
             <br>
@@ -90,7 +90,7 @@
           </v-timeline-item>
           <v-timeline-item small left class="text-right">
             <template v-slot:opposite>
-              <v-btn small dark color="blue" class="ml-4 mt-4" @click="handleSave">save</v-btn>
+              <v-btn small dark color="blue" class="ml-4 mt-4" @click="handleSave('publication')">save</v-btn>
             </template>
             <b>Publication Date</b>
             <br>
@@ -126,7 +126,7 @@
           </v-timeline-item>
           <v-timeline-item small left class="text-right">
             <template v-slot:opposite>
-              <v-btn small dark color="blue" class="ml-4 mt-4" @click="handleSave">save</v-btn>
+              <v-btn small dark color="blue" class="ml-4 mt-4" @click="handleSave('expiration')">save</v-btn>
             </template>
             <b>Expiration</b>
             <br>
@@ -173,7 +173,7 @@
             <label>Review Duration</label>
             <v-text-field
               type="number"
-              v-model="reviewDays"
+              v-model="tempReviewDays"
               outlined
               dense
             ></v-text-field>
@@ -184,7 +184,7 @@
               <label>Approval Duration</label>
               <v-text-field
                 type="number"
-                v-model="approvalDays"
+                v-model="tempApprovalDays"
                 dense
                 outlined
               ></v-text-field>
@@ -197,7 +197,7 @@
             <label>Publication Lead time</label>
             <v-text-field
               type="number"
-              v-model="publicationDays"
+              v-model="tempPublicationDays"
               dense
               outlined
             ></v-text-field>
@@ -208,7 +208,7 @@
               <label>Document validity</label>
               <v-text-field
                 type="number"
-                v-model="expirationDays"
+                v-model="tempExpirationDays"
                 outlined
                 dense
               ></v-text-field>
@@ -219,7 +219,7 @@
             dark
             color="blue"
             elevation="0"
-            @click="handleRecalculation"
+            @click="handleRecalculation('input')"
           >Recalculate timeline</v-btn>
         </v-container>
       </div>
@@ -240,10 +240,18 @@
         menu3: false,
         menu4: false,
         menu5: false,
+        initialreviewDate:null,
+        initialapprovalDate:null,
+        initialpublicationDate:null,
+        initialexpirationDate:null,
         reviewDays : null,
         approvalDays : null,
         publicationDays : null,
-        expirationDays : null
+        expirationDays : null,
+        tempReviewDays : null,
+        tempApprovalDays : null,
+        tempPublicationDays : null,
+        tempExpirationDays : null
       }
     },
     computed : {
@@ -257,24 +265,51 @@
         const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
         return diffDays
       },
-      handleSave(){
-        console.log("lastVersion",this.lastVersion)
+      saveTimelineInBackend(){
         axios.post('http://localhost:5000/createVersion',this.lastVersion)
           .then(res => {
             this.fileData = {}
             this.fileData = res.data.fileData
-            console.log("filedata response",res.data.fileData)
             this.lastVersion = this.fileData.versions[this.fileData.versions.length-1]
-            this.reviewDays = this.computeDiff(this.fileData.created,this.lastVersion.review)
-            this.approvalDays = this.computeDiff(this.lastVersion.review,this.lastVersion.approval)
-            this.publicationDays = this.computeDiff(this.lastVersion.approval,this.lastVersion.publication)
-            this.expirationDays = this.computeDiff(this.lastVersion.publication,this.lastVersion.expiration)
+            this.$emit('updateVersions',this.lastVersion)
           })
           .catch(err=>{
             console.log("error",err)
           })
       },
-      handleRecalculation(){
+      handleSave(phase){
+        if(this.lastVersion.review<this.fileData.created || this.lastVersion.approval<this.lastVersion.review || this.lastVersion.publication<this.lastVersion.approval || this.lastVersion.expiration<this.lastVersion.publication){
+          alert("enter a valid timeline")
+          return null
+        }
+        const initVal = 'initial'+phase+'Date'
+        alert("intial"+this[initVal]+"   changed"+this.lastVersion[phase])
+        if(this[initVal]==this.lastVersion[phase]){
+          alert("value is not changed")
+          return null
+        }
+        else{
+          this[initVal]=this.lastVersion[phase]
+        }
+        if(this.lastVersion[phase])
+        this.lastVersion = this.fileData.versions[this.fileData.versions.length-1]
+        if(phase=="review"){
+          this.reviewDays = this.computeDiff(this.fileData.created,this.lastVersion.review)
+        }else if(phase=="approval")
+          this.approvalDays = this.computeDiff(this.lastVersion.review,this.lastVersion.approval)
+        else if(phase=="publication")
+          this.publicationDays = this.computeDiff(this.lastVersion.approval,this.lastVersion.publication)
+        else 
+          this.expirationDays = this.computeDiff(this.lastVersion.publication,this.lastVersion.expiration)
+        this.handleRecalculation()
+      },
+      handleRecalculation(input){
+        if(input==="input"){
+          this.reviewDays = this.tempReviewDays;
+          this.approvalDays = this.tempApprovalDays
+          this.publicationDays = this.tempPublicationDays
+          this.expirationDays = this.tempExpirationDays
+        }
         var date = new Date(this.fileData.created)
         date.setDate(date.getDate() + parseInt(this.reviewDays))
         this.lastVersion.review = date.toISOString().split('T')[0]
@@ -289,7 +324,8 @@
         this.approvalDays = this.computeDiff(this.lastVersion.review,this.lastVersion.approval)
         this.publicationDays = this.computeDiff(this.lastVersion.approval,this.lastVersion.publication)
         this.expirationDays = this.computeDiff(this.lastVersion.publication,this.lastVersion.expiration)
-        this.handleSave()
+        console.log("lastversion",this.lastVersion)
+        this.saveTimelineInBackend()
       }
     },
     created(){
@@ -302,10 +338,28 @@
           this.approvalDays = this.computeDiff(this.lastVersion.review,this.lastVersion.approval)
           this.publicationDays = this.computeDiff(this.lastVersion.approval,this.lastVersion.publication)
           this.expirationDays = this.computeDiff(this.lastVersion.publication,this.lastVersion.expiration)
+          this.initialreviewDate = this.lastVersion.review
+          this.initialapprovalDate = this.lastVersion.approval
+          this.initialpublicationDate = this.lastVersion.publication
+          this.initialexpirationDate = this.lastVersion.expiration
         })
         .catch(err=>{
           console.log("error",err)
         })
+    },
+    watch:{
+      reviewDays(newVal){
+        this.tempReviewDays = newVal
+      },
+      approvalDays(newVal){
+        this.tempApprovalDays = newVal
+      },
+      publicationDays(newVal){
+        this.tempPublicationDays = newVal
+      },
+      expirationDays(newVal){
+        this.tempExpirationDays = newVal
+      }
     }
   }
   </script>

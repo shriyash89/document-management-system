@@ -23,7 +23,7 @@ const fileData = {
         "approval" : "2025-03-15",
         "publication" : "2025-04-21",
         "expiration" : "2025-04-25",
-        "changes" : "publication date has been changed"
+        "changes" : "publication changed"
       }
     ]
 }

@@ -42,7 +42,7 @@ app.post('/createVersion',(req,res)=>{
         const newVersion = req.body
         const newId = newVersion.id+1
         const createdDate = new Date().toISOString().split('T')[0]
-        fileData.versions.push({...newVersion,id:newId,name:'Version '+newId,created:createdDate})
+        fileData.versions.push({...newVersion,id:newId,name:'Version '+newId,created:createdDate,state:"Draft",changes:""})
         return res.status(200).json({"msg":"new version created successfully!",fileData:fileData})
     } catch (err) {
         console.log("error",err)
